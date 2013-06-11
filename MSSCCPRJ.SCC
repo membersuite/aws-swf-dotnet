@@ -1,0 +1,9 @@
+SCC = This is a source code control file
+
+[Simple Workflow Foundation .NET Framework.sln]
+SCC_Aux_Path = "P4SCC#perforce.dev.membersuite.com:1666##Andrew##andrew_mss_dev_office"
+SCC_Project_Name = Perforce Project
+
+[Amazon.SimpleWorkflow.DotNetFramework.Samples.csproj]
+SCC_Aux_Path = "P4SCC#perforce.dev.membersuite.com:1666##Andrew##andrew_mss_dev_office"
+SCC_Project_Name = Perforce Project

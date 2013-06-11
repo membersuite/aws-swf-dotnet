@@ -1,0 +1,79 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="SimpleWorkflowFoundationSettings">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="workflows" maxOccurs="1" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="workflow" maxOccurs="unbounded" minOccurs="0">
+                <xs:complexType>
+                  <xs:attribute name="type" type="xs:string" use="required" />
+                  <xs:attribute name="name" type="xs:string" use="required" />
+                  <xs:attribute name="version" type="xs:string" use="required" />
+                
+                  <xs:attribute name="defaultExecutionStartToCloseTimeout" type="xs:integer" use="optional" />
+                  <xs:attribute name="defaultTaskStartToCloseTimeout" type="xs:integer" use="optional" />                 
+                  
+                  <xs:attribute name="description" type="xs:string" use="optional" />
+                  <xs:attribute name="defaultTaskList" type="xs:string" use="optional" />
+                  <xs:attribute name="defaultChildPolicy" type="ChildPolicy" use="optional" />
+                  <xs:attribute name="alwaysKeepThisWorkflowRunning" type="xs:boolean" use="optional" />
+                  
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="activities" maxOccurs="1" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence maxOccurs="unbounded" minOccurs="0">
+              <xs:element name="activity">
+                <xs:complexType>
+                  <xs:attribute name="type" type="xs:string" use="required" />
+                  <xs:attribute name="name" type="xs:string" use="required" />
+                  <xs:attribute name="version" type="xs:string" use="required" />
+                  <xs:attribute name="taskScheduleToStartTimeout" type="xs:integer" use="optional" />
+                  <xs:attribute name="taskStartToCloseTimeout" type="xs:integer" use="optional" />
+                  <xs:attribute name="taskScheduleToCloseTimeout" type="xs:integer" use="optional" />
+                  <xs:attribute name="heartbeatTimeout" type="xs:integer" use="required" />
+                  <xs:attribute name="description" type="xs:string" use="optional" />
+                  <xs:attribute name="defaultTaskList" type="xs:string" use="optional" />
+                  
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="clients" maxOccurs="1" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="client" maxOccurs="unbounded" minOccurs="0">
+                <xs:complexType>
+                  <xs:attribute name="workflowName" type="xs:string" use="required" />
+                  <xs:attribute name="workflowVersion" type="xs:string" use="optional" />
+                  
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="domain" type="xs:string" use="required" />
+      <xs:attribute name="s3BucketName" type="xs:string" use="required" />
+      <xs:attribute name="prefixTaskListWithComputerName" type="xs:string" use="optional" />
+      <xs:attribute name="enableWorkflowMetrics" type="xs:string" use="optional" />
+      <xs:attribute name="maxActivityThreads" type="xs:integer" use="required" />
+      <xs:attribute name="maxDeciderThreads" type="xs:integer" use="required" />
+    </xs:complexType>
+  </xs:element>
+  <xs:simpleType name="ChildPolicy">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="TERMINATE"/>
+      <xs:enumeration value="REQUEST_CANCEL"/>
+      <xs:enumeration value="ABANDON"/>
+
+
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>

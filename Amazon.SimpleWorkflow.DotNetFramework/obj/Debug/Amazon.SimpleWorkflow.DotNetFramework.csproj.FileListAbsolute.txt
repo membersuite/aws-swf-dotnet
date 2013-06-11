@@ -1,0 +1,13 @@
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\bin\Debug\app.config.transform
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\bin\Debug\web.config.transform
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\bin\Debug\Amazon.SimpleWorkflow.DotNetFramework.dll
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\bin\Debug\Amazon.SimpleWorkflow.DotNetFramework.pdb
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\bin\Debug\AWSSDK.dll
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\bin\Debug\MemberSuite.SDK.dll
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\bin\Debug\Spring.Core.dll
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\bin\Debug\antlr.runtime.dll
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\bin\Debug\Common.Logging.dll
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\bin\Debug\MemberSuite.SDK.pdb
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\obj\Debug\ResolveAssemblyReference.cache
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\obj\Debug\Amazon.SimpleWorkflow.DotNetFramework.dll
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework\obj\Debug\Amazon.SimpleWorkflow.DotNetFramework.pdb

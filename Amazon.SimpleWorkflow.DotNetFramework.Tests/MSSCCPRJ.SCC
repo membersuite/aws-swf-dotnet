@@ -1,0 +1,5 @@
+SCC = This is a source code control file
+
+[Amazon.SimpleWorkflow.DotNetFramework.Tests.csproj]
+SCC_Aux_Path = "P4SCC#perforce.dev.membersuite.com:1666##Andrew##andrew_mss_dev_office"
+SCC_Project_Name = Perforce Project

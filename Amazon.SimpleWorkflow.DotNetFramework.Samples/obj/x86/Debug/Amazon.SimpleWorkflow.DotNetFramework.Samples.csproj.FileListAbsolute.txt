@@ -1,0 +1,8 @@
+C:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Samples\bin\Debug\Amazon.SimpleWorkflow.DotNetFramework.Samples.exe
+C:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Samples\bin\Debug\Amazon.SimpleWorkflow.DotNetFramework.Samples.pdb
+C:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Samples\bin\Debug\Amazon.SimpleWorkflow.DotNetFramework.dll
+C:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Samples\bin\Debug\Amazon.SimpleWorkflow.DotNetFramework.pdb
+C:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Samples\obj\x86\Debug\ResolveAssemblyReference.cache
+C:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Samples\obj\x86\Debug\Amazon.SimpleWorkflow.DotNetFramework.Samples.exe
+C:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Samples\obj\x86\Debug\Amazon.SimpleWorkflow.DotNetFramework.Samples.pdb
+C:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Samples\bin\Debug\Amazon.SimpleWorkflow.DotNetFramework.Samples.exe.config

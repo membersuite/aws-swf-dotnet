@@ -1,0 +1,9 @@
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Tests\obj\Debug\ResolveAssemblyReference.cache
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Tests\bin\Debug\Amazon.SimpleWorkflow.DotNetFramework.Tests.dll.config
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Tests\bin\Debug\Amazon.SimpleWorkflow.DotNetFramework.Tests.dll
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Tests\bin\Debug\Amazon.SimpleWorkflow.DotNetFramework.Tests.pdb
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Tests\bin\Debug\Amazon.SimpleWorkflow.DotNetFramework.dll
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Tests\bin\Debug\AWSSDK.dll
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Tests\bin\Debug\Amazon.SimpleWorkflow.DotNetFramework.pdb
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Tests\obj\Debug\Amazon.SimpleWorkflow.DotNetFramework.Tests.dll
+c:\perforce\mss\dev-andrew\workflow\Amazon.SimpleWorkflow.DotNetFramework.Tests\obj\Debug\Amazon.SimpleWorkflow.DotNetFramework.Tests.pdb
