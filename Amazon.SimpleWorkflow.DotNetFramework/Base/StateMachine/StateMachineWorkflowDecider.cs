@@ -5,6 +5,7 @@ using System.Text;
 using Amazon.SimpleWorkflow.DotNetFramework.Constants;
 using Amazon.SimpleWorkflow.DotNetFramework.Util;
 using Amazon.SimpleWorkflow.Model;
+using MemberSuite;
 
 namespace Amazon.SimpleWorkflow.DotNetFramework.Base.StateMachine
 {
@@ -47,11 +48,8 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base.StateMachine
                 if (state == null)
                     throw new ApplicationException("No initial state given.");
 
-                if (state.DefaultInputToUse == null)
-                    state.WithDefaultInput(WorkflowExecutionContext.GetWorkflowInput());    // always use the default input
-
-               // WorkflowLogging.Debug("{0}: Initiating workflow ID {1} with state '{2}'",
-                 //   GetType().Name, WorkflowExecutionContext.Current.WorkflowId,state.GetType().Name  );
+                //WorkflowLogging.Debug("WFM: Initiating workflow ID {1} with state '{2}'",
+                //    GetType().Name, WorkflowExecutionContext.Current.WorkflowId, state.GetType().Name);
             }
             else
             {
@@ -65,10 +63,13 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base.StateMachine
                 if (state == null)
                     throw new ApplicationException(string.Format("Unable to locate a class named '{0}' that derives from StateMachineWorkflowState", currentState));
 
-                //WorkflowLogging.Debug("{0}: Continuing workflow ID {1} with state '{2}'",
-                //GetType().Name, WorkflowExecutionContext.Current.WorkflowId, state.GetType().Name);
+               // WorkflowLogging.Debug("WFM: Continuing workflow ID {1} with state '{2}'",
+               // GetType().Name, WorkflowExecutionContext.Current.WorkflowId, state.GetType().Name);
                 
             }
+
+            if (state.DefaultInputToUse == null)
+                state.WithDefaultInput(WorkflowExecutionContext.GetWorkflowInput());    // always use the default input
 
              
             // ok, now the question is; is this decision task running because an activity has finished? In other words,
@@ -89,8 +90,8 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base.StateMachine
             if (lastEvent == null ||       // we've got no event, so this is the beginning of the workflow
                 lastEvent.EventType == WorkflowHistoryEventTypes.MarkerRecorded)  // the last event was the state, so execute the state
             {
-                //WorkflowLogging.Debug("Workflow '{0}' - executing state '{1}'",
-                  //  GetType().Name, state.GetType().Name);
+                //WorkflowLogging.Debug("WFM: Workflow '{0}' - executing state '{1}'",
+                //    GetType().Name, state.GetType().Name);
 
                 state.Execute( GetInitialStateInput() );
                 return;
@@ -133,7 +134,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base.StateMachine
 
 
             if (nestedControllerType != null) // then that's it
-                state = Activator.CreateInstance(nestedControllerType) as StateMachineWorkflowState;
+                state = Container.GetOrCreateInstance(nestedControllerType) as StateMachineWorkflowState;
             return state;
         }
 

@@ -41,7 +41,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests
 
             // it should not take more than a few seconds
 
-            WorkflowManager.WaitUntilWorkflowCompletes( workflowExecutionId, resp.StartWorkflowExecutionResult.Run.RunId);
+            WorkflowManager.WaitUntilWorkflowCompletes( workflowExecutionId, resp.Run.RunId);
             
             
 
@@ -85,7 +85,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests
             var workflowExecutionId = Guid.NewGuid().ToString();
             var resp = WorkflowManager.StartWorkflow("LargeInputWorkflow", workflowExecutionId, null, msg.ToString(), new List<string> { "SimpleWorkflowWithS3InputStorage_Test" });
 
-            WorkflowManager.WaitUntilWorkflowCompletes(workflowExecutionId, resp.StartWorkflowExecutionResult.Run.RunId);
+            WorkflowManager.WaitUntilWorkflowCompletes(workflowExecutionId, resp.Run.RunId);
 
             FileInfo fi = new FileInfo(fileName);
 

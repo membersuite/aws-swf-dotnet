@@ -36,11 +36,20 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
                 }
                 try
                 {
-                WorkflowManager.SWFClient.RespondDecisionTaskCompleted( new RespondDecisionTaskCompletedRequest()
-                .WithTaskToken( taskToDecide.TaskToken )
-                .WithDecisions(
-                new Decision().WithDecisionType(DecisionTypes.FailWorkflowExecution ).WithFailWorkflowExecutionDecisionAttributes( new FailWorkflowExecutionDecisionAttributes()
-                .WithReason( "Exception" ).WithDetails( ex.ToString()))));
+                    WorkflowManager.SWFClient.RespondDecisionTaskCompleted(new RespondDecisionTaskCompletedRequest()
+                        {
+                            TaskToken = taskToDecide.TaskToken,
+                            Decisions = new List<Decision>{ new  Decision()
+                                {
+                                    DecisionType = DecisionTypes.FailWorkflowExecution,
+                                    FailWorkflowExecutionDecisionAttributes =
+                                        new FailWorkflowExecutionDecisionAttributes()
+                                            {
+                                                Reason = "Exception",
+                                                Details = ex.ToString()
+                                            }
+                                } }
+                        });
                 }
                 catch (Exception ex2)
                 {
@@ -58,10 +67,19 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
         /// Checks to see if the last activity timed out, and if so, whether it should be rescheduled
         /// </summary>
         /// <returns></returns>
-        private bool determineIfAnActivityShouldBeRescheduled()
+        protected virtual bool determineIfAnActivityShouldBeRescheduled()
         {
+            
+            HistoryEvent lastEvent;
 
-            var lastEvent = WorkflowExecutionContext.FindMostRecentActivityRelatedEvent();
+            try
+            {
+                lastEvent = WorkflowExecutionContext.FindMostRecentActivityRelatedEvent();
+            }
+            catch
+            {
+                return false;   // swallow any exceptions
+            }
             if (lastEvent == null || lastEvent.EventType != WorkflowHistoryEventTypes.ActivityTaskTimedOut)
                 return false;    // no joy
 
@@ -106,13 +124,17 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
             decision.ScheduleActivityTaskDecisionAttributes.TaskList.Name  = scheduledActivityAttr.TaskList.Name;
             decision.ScheduleActivityTaskDecisionAttributes.ActivityId = scheduledActivityAttr.ActivityId;  // IMPORTANT! We must keep the ID the same
 
-            var req = new RespondDecisionTaskCompletedRequest().WithTaskToken(WorkflowExecutionContext.CurrentDecisionTask.TaskToken).WithDecisions(
+            var req = new RespondDecisionTaskCompletedRequest()
+            {
+                TaskToken = WorkflowExecutionContext.CurrentDecisionTask.TaskToken,
+                Decisions =
                new List<Decision> { 
                     decision,
 
                     // and, let's record the current state
                     DecisionGenerator.GenerateMarkerDecision( variable, retryCount.ToString() )
-                });
+                }
+            };
 
             WorkflowManager.SWFClient.RespondDecisionTaskCompleted(req);
 

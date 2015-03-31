@@ -1,6 +1,8 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.30501.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Amazon.SimpleWorkflow.DotNetFramework", "Amazon.SimpleWorkflow.DotNetFramework\Amazon.SimpleWorkflow.DotNetFramework.csproj", "{D4A71742-69E3-47A5-ADFF-689709B8AE7E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Amazon.SimpleWorkflow.DotNetFramework.Tests", "Amazon.SimpleWorkflow.DotNetFramework.Tests\Amazon.SimpleWorkflow.DotNetFramework.Tests.csproj", "{13BE0033-A9A6-44AB-B3A3-BCE175186732}"
@@ -8,17 +10,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Amazon.SimpleWorkflow.DotNetFramework.Samples", "Amazon.SimpleWorkflow.DotNetFramework.Samples\Amazon.SimpleWorkflow.DotNetFramework.Samples.csproj", "{C63FEF60-27FF-4177-8443-EB46DF22461A}"
 EndProject
 Global
-	GlobalSection(SourceCodeControl) = preSolution
-		SccNumberOfProjects = 4
-		SccProjectUniqueName0 = Amazon.SimpleWorkflow.DotNetFramework\\Amazon.SimpleWorkflow.DotNetFramework.csproj
-		SccLocalPath0 = Amazon.SimpleWorkflow.DotNetFramework
-		SccProjectUniqueName1 = Amazon.SimpleWorkflow.DotNetFramework.Tests\\Amazon.SimpleWorkflow.DotNetFramework.Tests.csproj
-		SccLocalPath1 = Amazon.SimpleWorkflow.DotNetFramework.Tests
-		SccLocalPath2 = .
-		SccProjectUniqueName3 = Amazon.SimpleWorkflow.DotNetFramework.Samples\\Amazon.SimpleWorkflow.DotNetFramework.Samples.csproj
-		SccLocalPath3 = .
-		SccProjectFilePathRelativizedFromConnection3 = Amazon.SimpleWorkflow.DotNetFramework.Samples\\
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|Mixed Platforms = Debug|Mixed Platforms

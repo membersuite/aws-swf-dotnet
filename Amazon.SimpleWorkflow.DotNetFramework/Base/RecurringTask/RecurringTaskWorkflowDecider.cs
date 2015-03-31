@@ -16,21 +16,26 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base.RecurringTask
     {
         protected abstract Type getActivityTask();
         //const int MAX_NUMBER_OF_EVENTS = 250;
-        //protected virtual int getMaximumNumberOfExecutions()
-        //{
-        //    return 100;
-        //}
+        protected virtual int getMaximumNumberOfExecutions()
+        {
+            return 100;
+        }
 
-        ///// <summary>
-        ///// When set to false, after max executions the workflow continues as a new workflow
-        ///// </summary>
-        //protected virtual bool TerminateWorkflowAfterMaxExecutions
-        //{
-        //    get { return false; }
-        //}
-        protected TimeSpan  getMaximumAmountOfTimeBeforeRespawning()
+        /// <summary>
+        /// When set to false, after max executions the workflow continues as a new workflow
+        /// </summary>
+        protected virtual bool TerminateWorkflowAfterMaxExecutions
+        {
+            get { return false; }
+        }
+        protected TimeSpan getMaximumAmountOfTimeBeforeRespawning()
         {
             return TimeSpan.FromHours(1);
+        }
+
+        protected override bool determineIfAnActivityShouldBeRescheduled()
+        {
+            return false;   // never reschedule activities
         }
 
         public override void respondWithDecision()
@@ -40,7 +45,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base.RecurringTask
             var lastEvent = WorkflowExecutionContext.FindMostRecentEvent(
                 x => x.EventType == WorkflowHistoryEventTypes.TimerFired ||
                     x.EventType == WorkflowHistoryEventTypes.WorkflowExecutionStarted ||
-                x.EventType.StartsWith("ActivityTask"));
+                x.EventType.Value.StartsWith("ActivityTask"));
 
             // now, if the last event was a timer firing, then we need to schedule the activity
             RespondDecisionTaskCompletedRequest respondDecisionTaskCompletedRequest;
@@ -52,32 +57,29 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base.RecurringTask
                 // let's put the timer in place
 
                 // but, have we reached our max?
-                //var respExecutionCount = WorkflowExecutionContext.GetWorkflowVariable("ExecutionCount");
-                //int executionCount = 0;
+                var respExecutionCount = WorkflowExecutionContext.GetWorkflowVariable("ExecutionCount");
+                int executionCount = 0;
 
-                //if (respExecutionCount != null)
-                //    int.TryParse(respExecutionCount.Details, out executionCount);
+                if (respExecutionCount != null)
+                    int.TryParse(respExecutionCount.Details, out executionCount);
 
-                //var maxExecutions = getMaximumNumberOfExecutions();
-             
+                var maxExecutions = getMaximumNumberOfExecutions();
 
-                //// we use MAX_NUMBER_OF_EVENTS because after the event log gets to big, AWS starts spitting out 
-                //// wierd errors. So we constrain
-                //    if (executionCount >= maxExecutions
-                //        || WorkflowExecutionContext.CurrentDecisionTask.Events.Count > MAX_NUMBER_OF_EVENTS 
-                //        ) // that's it
-                //    {
-                //        string result = "An execution count of " + executionCount +
-                //                        " has been reached.";
-                //        if (TerminateWorkflowAfterMaxExecutions)  // we're done
-                //            WorkflowExecutionContext.CompleteCurrentWorkflow(result);
-                //        else
-                //            WorkflowExecutionContext.ContinueCurrentWorkflowAsNew(result);
-                        
 
-                   
-                //        return;
-                //    }
+
+                if (executionCount >= maxExecutions) // that's it
+                {
+                    string result = "An execution count of " + executionCount +
+                                    " has been reached.";
+                    if (TerminateWorkflowAfterMaxExecutions)  // we're done
+                        WorkflowExecutionContext.CompleteCurrentWorkflow(result);
+                    else
+                        WorkflowExecutionContext.ContinueCurrentWorkflowAsNew(result);
+
+
+
+                    return;
+                }
                 var detail = WorkflowExecutionContext.DescribeCurrentlyExecutingWorkflow();
                 TimeSpan tsRunning = DateTime.Now - detail.ExecutionInfo.StartTimestamp;
 
@@ -92,15 +94,18 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base.RecurringTask
                 }
 
                 // ok, we're good, let's just schedule the timer
-                respondDecisionTaskCompletedRequest = new RespondDecisionTaskCompletedRequest().WithTaskToken(
-                    WorkflowExecutionContext.TaskToken).WithDecisions(
-                        new List<Decision>
+                respondDecisionTaskCompletedRequest = new RespondDecisionTaskCompletedRequest()
+                {
+                    TaskToken = WorkflowExecutionContext.TaskToken,
+                    Decisions =
+                            new List<Decision>
                             {
                                 DecisionGenerator.GenerateTimerDecision(getTimerInterval(), "RecurringTaskTimer", null),
 
                                 // and let's update the execution count
-                                //DecisionGenerator.GenerateMarkerDecision("ExecutionCount", (executionCount + 1 ).ToString())
-                            });
+                                DecisionGenerator.GenerateMarkerDecision("ExecutionCount", (executionCount + 1 ).ToString())
+                            }
+                };
             }
             else
             {
@@ -114,12 +119,15 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base.RecurringTask
                 string taskList = wc.DefaultTaskList;
 
 
-                respondDecisionTaskCompletedRequest = new RespondDecisionTaskCompletedRequest().WithTaskToken(
-                    WorkflowExecutionContext.TaskToken).WithDecisions(
-                        new List<Decision>
+                respondDecisionTaskCompletedRequest = new RespondDecisionTaskCompletedRequest()
+                {
+                    TaskToken = WorkflowExecutionContext.TaskToken,
+                    Decisions =
+                            new List<Decision>
                             {
                                 DecisionGenerator.GenerateScheduleTaskActivityDecision(taskList, wc.Name, version, null)
-                            });
+                            }
+                };
             }
 
             WorkflowManager.SWFClient.RespondDecisionTaskCompleted(respondDecisionTaskCompletedRequest);

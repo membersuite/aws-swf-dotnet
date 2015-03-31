@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
@@ -61,7 +62,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
         {
             lastSWFResponse = DateTime.Now; // just so there is a starting point
             startOfFirstPolling = DateTime.Now;
-            WorkflowLogging.Debug("Starting {0} {1}....", GetType().Name, Name);
+            WorkflowLogging.Debug("Starting {0} {1}.... Task List: {2}", GetType().Name, Name, _taskList ?? "[DEFAULT]");
            pollForTasks();
            WorkflowLogging.Debug("{0} {1} has been started.", GetType().Name, Name);
         }
@@ -112,7 +113,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
 
         }
 
-        private Dictionary<Thread, bool> threadQueue = new Dictionary<Thread, bool>();
+        protected ConcurrentDictionary<Thread, bool> threadQueue = new ConcurrentDictionary<Thread, bool>();
         /// <summary>
         /// Starts a new thread, and keeps a reference to it so it does not go out of scope
         /// </summary>
@@ -120,7 +121,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
         /// <param name="state"></param>
         protected void startThread(Thread thread, object state)
         {
-            threadQueue.Add(thread, true);
+            threadQueue.TryAdd(thread, true);
             thread.Start(state);
 
         }
@@ -131,8 +132,10 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
         /// <param name="thread"></param>
         protected void registerEndOfThread(Thread thread )
         {
-            threadQueue.Remove(thread);
-            
+            bool outVal;
+            threadQueue.TryRemove(thread, out outVal);
+           
+
 
         }
 

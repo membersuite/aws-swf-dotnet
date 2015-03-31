@@ -71,9 +71,9 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
             int workerThreads, completionThreads;
             ThreadPool.GetMaxThreads(out workerThreads, out completionThreads);
             WorkflowLogging.Debug("Workflow Manager Starting up... maximum number of worker threads is {0}, completion threads {1}....",
-                workerThreads, completionThreads );
-                
-                
+                workerThreads, completionThreads);
+
+
             WorkflowLogging.Debug("Workflow Manager: Initializing workflows....");
             initializeWorkflows();
             WorkflowLogging.Debug("Workflow Manager: Initializing activities....");
@@ -98,7 +98,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
         #region Scheduling
 
         private static Timer _metricsTimer;
-        
+
         /// <summary>
         /// Initializes the monitoring timers that check the health of all listeners
         /// </summary>
@@ -130,7 +130,8 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
             }
             finally
             {
-                _metricsTimer.Change(_getMetricsCollectionPeriod(), Timeout.Infinite);
+                if (_metricsTimer != null)  // if it's null, the app stopped
+                    _metricsTimer.Change(_getMetricsCollectionPeriod(), Timeout.Infinite);
             }
         }
 
@@ -154,16 +155,18 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
             {
                 string workflowVersion = GetCurrentVersionOfWorkflowType(workflowTypeName);
 
-
-                StartWorkflowExecutionRequest request = new StartWorkflowExecutionRequest()
-                    .WithDomain(_domainName)
-                    .WithWorkflowId(workflowExecutionID)
-                    .WithWorkflowType(
-                        new WorkflowType()
-                            .WithName(workflowTypeName)
-                            .WithVersion(workflowVersion))
-                    .WithTaskList(GetTaskList(workflowTypeName, taskList))
-                    .WithInput(WorkflowExecutionContext.PrepareInputForWorkflow(input));
+                StartWorkflowExecutionRequest request = new StartWorkflowExecutionRequest
+                    {
+                        Domain = _domainName,
+                        WorkflowId = workflowExecutionID,
+                        WorkflowType = new WorkflowType()
+                            {
+                                Name = workflowTypeName,
+                                Version = workflowVersion
+                            },
+                        TaskList = FormatTaskListAsNecessary(taskList),
+                        Input = WorkflowExecutionContext.PrepareInputForWorkflow(input)
+                    };
 
                 if (tags != null && tags.Count > 0)
                     request.TagList = tags;
@@ -176,7 +179,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
             catch (AmazonSimpleWorkflowException ex)
             {
                 // did we exceed the rate?
-                if (ex.Message.Contains("Rate exceeded"))
+                if (ex.Message.Contains("Rate exceeded") && ex.ErrorCode == "ThrottlingException")
                 {
                     long backOffValue = simpleWorkflowFoundationRetryManager.CalculateExponentialBackOff();
                     WorkflowLogging.Debug(
@@ -186,36 +189,48 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
 
                 }
 
+                if (ex.ErrorCode == "WorkflowExecutionAlreadyStartedFault")
+                    throw new SimpleWorkflowDotNetFrameworkException(ex.ErrorCode,
+                                                                     "The specified workflow is already running and cannot be executed more than once at a time");
+
+                    
+
                 throw;
             }
 
+
         }
 
-        public static TaskList GetTaskList(string workflowTypeName, string taskList)
+        const string ENV_JES_TASKLIST = "JES_TaskList";
+        const string TASK_LIST_DEFAULT = "AllTasks";
+        public static TaskList FormatTaskListAsNecessary(string taskList)
         {
-            // ok - we've rewritten the code so that we have a single poller; so this should now be "AllTasks";
-            taskList = "AllTasks";
+            // ok, we can specify the task list in a few place
+            // first, it could be in the environment
 
-            
-
-            string fullyQualifiedTaskListName;
-            string prefix = "";
             if (string.IsNullOrWhiteSpace(taskList))
-                fullyQualifiedTaskListName = workflowTypeName;
-            else
-                fullyQualifiedTaskListName = taskList;
+                taskList = TASK_LIST_DEFAULT;
+
+
+
+            string fullyQualifiedTaskListName = taskList;
+            string prefix = "";
+
 
             if (SimpleWorkflowFoundationSettings.Settings.PrefixTaskListWithComputerName &&
                  !fullyQualifiedTaskListName.StartsWith(Environment.MachineName + "-"))
                 prefix = Environment.MachineName + "-";
 
-            if ( SimpleWorkflowFoundationSettings.Settings.PrefixTaskListWithProcessName  )
-                prefix += Process.GetCurrentProcess().ProcessName+ "-";
+            if (SimpleWorkflowFoundationSettings.Settings.PrefixTaskListWithProcessName)
+                prefix += Process.GetCurrentProcess().ProcessName + "-";
 
 
             fullyQualifiedTaskListName = prefix + fullyQualifiedTaskListName;
 
-            return new TaskList().WithName(fullyQualifiedTaskListName);
+            return new TaskList()
+                {
+                    Name = fullyQualifiedTaskListName
+                };
         }
 
         private static Dictionary<string, string> workflowVersions = new Dictionary<string, string>();
@@ -272,9 +287,12 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
             try
             {
                 var types = SWFClient.ListWorkflowTypes(new ListWorkflowTypesRequest()
-                                                            .WithDomain(Domain)
-                                                            .WithName(workflowName).WithRegistrationStatus("REGISTERED"))
-                    .ListWorkflowTypesResult.WorkflowTypeInfos;
+                {
+                    Domain = (Domain),
+                    Name = (workflowName),
+                    RegistrationStatus = ("REGISTERED")
+                })
+                    .WorkflowTypeInfos;
 
                 do
                 {
@@ -290,8 +308,8 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
                     if (types.NextPageToken != null)
                         types =
                             SWFClient.ListWorkflowTypes(
-                                new ListWorkflowTypesRequest().WithNextPageToken(types.NextPageToken)).
-                                ListWorkflowTypesResult.WorkflowTypeInfos;
+                                new ListWorkflowTypesRequest() { NextPageToken = (types.NextPageToken) }).
+                                WorkflowTypeInfos;
                     else
                         break; // keep going until there's no more
                 } while (true);
@@ -318,9 +336,9 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
         {
             WorkflowLogging.Debug("Pausing workflows...");
 
-            if ( _deciderTaskListener != null ) _deciderTaskListener.Pause();
+            if (_deciderTaskListener != null) _deciderTaskListener.Pause();
             if (_activityTaskListener != null) _activityTaskListener.Pause();
-            
+
             if (_monitorWorkflowThatShouldAlwaysBeRunningTimer != null)
             {
                 pausedMonitoringThread = true;
@@ -329,7 +347,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
             else
                 pausedMonitoringThread = false;
 
-           
+
             WorkflowLogging.Debug("Workflows paused. Waiting...");
         }
 
@@ -348,26 +366,60 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
             WorkflowLogging.Debug("Workflows back online...");
         }
 
+        private const int MAX_SECS_WAIT_FOR_TASKS_TO_FINISH = 30;
         public static void Shutdown()
         {
+            WorkflowLogging.Debug("Shutting down...");
+            WorkflowLogging.Debug("Stopping decider listener...");
+
             if (_deciderTaskListener != null) _deciderTaskListener.Stop();
+
+            WorkflowLogging.Debug("Stopping activity listener...");
             if (_activityTaskListener != null) _activityTaskListener.Stop();
 
-           
+
+            WorkflowLogging.Debug("Stopping workflow monitor...");
             if (_monitorWorkflowThatShouldAlwaysBeRunningTimer != null)
                 _monitorWorkflowThatShouldAlwaysBeRunningTimer.Dispose();
 
+            WorkflowLogging.Debug("Decider listener has {0} running task, activity lister has {1} running tasks. Waiting for completion...",
+                _deciderTaskListener != null ? _deciderTaskListener.CurrentlyRunningTasks : 0,
+                _activityTaskListener != null ? _activityTaskListener.CurrentlyRunningTasks : 0);
             // now wait
-            while ((_deciderTaskListener != null && _deciderTaskListener.CurrentlyRunningTasks > 0 )
+
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            while ((_deciderTaskListener != null && _deciderTaskListener.CurrentlyRunningTasks > 0)
                 ||
-                 (_activityTaskListener != null && _activityTaskListener.CurrentlyRunningTasks > 0 ))
+                 (_activityTaskListener != null && _activityTaskListener.CurrentlyRunningTasks > 0))
             {
                 WorkflowLogging.Debug("Waiting for tasks to complete...");
                 Thread.Sleep(1000);
+
+                if (sw.Elapsed.TotalSeconds > MAX_SECS_WAIT_FOR_TASKS_TO_FINISH)
+                {
+                    WorkflowLogging.Debug(
+                        "{0:N} s elapsed... forcing workflow shutdown. {1} decider tasks, {2} activity tasks.",
+                        sw.Elapsed.TotalSeconds,
+                        _deciderTaskListener != null ? _deciderTaskListener.CurrentlyRunningTasks : 0,
+                        _activityTaskListener != null ? _activityTaskListener.CurrentlyRunningTasks : 0);
+                    break;
+                }
+            }
+            sw.Stop();
+
+            WorkflowLogging.Debug("Stopping metrics collection...");
+            if (_metricsTimer != null)
+            {
+                _metricsTimer.Dispose();
+                _metricsTimer = null;
             }
 
-            if (_metricsTimer != null)
-                _metricsTimer.Dispose();
+            WorkflowLogging.Debug("Stopping client...");
+            SWFClient.Dispose();
+
+
+            WorkflowLogging.Debug("Workflow manager shutdown complete.");
         }
 
 
@@ -399,11 +451,17 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
                 {
                     var resp = _workflowClient.DescribeWorkflowType(
                         new DescribeWorkflowTypeRequest()
-                            .WithDomain(_domainName)
-                            .WithWorkflowType(new WorkflowType().WithName(workflowName).WithVersion(w.Version)));
+                            {
+                                Domain = _domainName,
+                                WorkflowType = new WorkflowType
+                                    {
+                                        Name = workflowName,
+                                        Version = w.Version
+                                    }
+                            });
 
 
-                    if (resp.DescribeWorkflowTypeResult.WorkflowTypeDetail.TypeInfo.Status == "DEPRECATED")
+                    if (resp.WorkflowTypeDetail.TypeInfo.Status == "DEPRECATED")
                         throw new ApplicationException(
                             string.Format("Workflow type '{0}' version {1} is deprecated, and cannot be used.",
                                           w.Name, w.Version));
@@ -431,7 +489,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
                 }
 
 
-          
+
 
 
                 // now, let's try to start it. If it fails, that's fine, that just means it's already running
@@ -448,10 +506,10 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
                         WorkflowManager.StartWorkflow(w.Name, _getWorkflowExecutionIDForAlwaysRunningWorkflow(w), null, null, null);
                         WorkflowLogging.Debug("Workflow '{0}' started successfully.", w.Name);
                     }
-                    catch (AmazonSimpleWorkflowException ex)
+                    catch (SimpleWorkflowDotNetFrameworkException ex)
                     {
                         if (ex.ErrorCode == "WorkflowExecutionAlreadyStartedFault")
-                            WorkflowLogging.Debug("Workflow '{0}' is already running, no need to restart.", w.Name );
+                            WorkflowLogging.Debug("Workflow '{0}' is already running, no need to restart.", w.Name);
                         else
                             WorkflowLogging.Error("ERROR starting workflow: {0}\r\n\r\n{1}",
                                 w.Name, ex);
@@ -463,9 +521,11 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
             if (SimpleWorkflowFoundationSettings.Settings.Workflows.Count > 0)
             {
 
+                // what task list are we using?
+                var defaultTaskList = Environment.GetEnvironmentVariable(ENV_JES_TASKLIST);
                 // we need to create a listener, then add it as a member so it doesn't break
                 _deciderTaskListener = new DeciderTaskListener(_workflowClient, _domainName,
-                                                               GetTaskList(null, null).Name);
+                                                               FormatTaskListAsNecessary(defaultTaskList).Name);
                 ;
                 _deciderTaskListener.Start();
             }
@@ -479,7 +539,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
 
             string id = w.Name;
             string prefix = "";
-            if (SimpleWorkflowFoundationSettings.Settings.PrefixTaskListWithComputerName )
+            if (SimpleWorkflowFoundationSettings.Settings.PrefixTaskListWithComputerName)
                 prefix = Environment.MachineName + "-";
 
             if (SimpleWorkflowFoundationSettings.Settings.PrefixTaskListWithProcessName)
@@ -515,11 +575,15 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
 
         private static void createWorkflowFromConfiguration(WorkflowConfiguration w)
         {
-            var request = new RegisterWorkflowTypeRequest().WithDomain(_domainName).WithName(w.Name)
-                .WithVersion(w.Version)
-                .WithDefaultChildPolicy(w.DefaultChildPolicy)
-                 .WithDefaultTaskList(GetTaskList(w.Name, w.DefaultTaskList))
-                 .WithDescription(w.Description);
+            var request = new RegisterWorkflowTypeRequest()
+                {
+                    Domain = _domainName,
+                    Name = w.Name,
+                    Version = w.Version,
+                    DefaultChildPolicy = w.DefaultChildPolicy,
+                    DefaultTaskList = FormatTaskListAsNecessary(w.DefaultTaskList),
+                    Description = w.Description
+                };
 
             if (w.DefaultExecutionStartToCloseTimeout != null)
                 request.DefaultExecutionStartToCloseTimeout = w.DefaultExecutionStartToCloseTimeout.ToString();
@@ -535,11 +599,13 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
         private static void createActivityFromConfiguration(ActivityConfiguration w)
         {
             var request = new RegisterActivityTypeRequest()
-                .WithDomain(_domainName)
-                .WithName(w.Name)
-                .WithVersion(w.Version)
-                .WithDefaultTaskList(GetTaskList(w.Name, w.DefaultTaskList))
-                .WithDescription(w.Description);
+            {
+                Domain = (_domainName),
+                Name = (w.Name),
+                Version = (w.Version),
+                DefaultTaskList = (FormatTaskListAsNecessary(w.DefaultTaskList)),
+                Description = (w.Description)
+            };
 
             if (w.HeartbeatTimeout != null)
                 request.DefaultTaskHeartbeatTimeout = w.HeartbeatTimeout.ToString();
@@ -582,12 +648,14 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
                 try
                 {
                     var resp = _workflowClient.DescribeActivityType(
-                       new DescribeActivityTypeRequest()
-                           .WithDomain(_domainName)
-                           .WithActivityType(new ActivityType().WithName(activityName).WithVersion(a.Version)));
+                        new DescribeActivityTypeRequest()
+                            {
+                                Domain = _domainName,
+                                ActivityType = new ActivityType() { Name = (activityName), Version = (a.Version) }
+                            });
 
 
-                    if (resp.DescribeActivityTypeResult.ActivityTypeDetail.TypeInfo.Status == "DEPRECATED")
+                    if (resp.ActivityTypeDetail.TypeInfo.Status == "DEPRECATED")
                         throw new ApplicationException(string.Format("Activity type '{0}' version {1} is deprecated, and cannot be used.",
                             a.Name, a.Version));
 
@@ -610,16 +678,19 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
                         throw;
                 }
 
-                
+
 
 
             }
 
             if (SimpleWorkflowFoundationSettings.Settings.Activities.Count > 0)
             {
+                // what task list are we using?
+                var defaultTaskList = Environment.GetEnvironmentVariable(ENV_JES_TASKLIST);
+
                 // we need to create a listener, then add it as a member so it doesn't break
                 _activityTaskListener = new ActivityTaskListener(_workflowClient, _domainName,
-                                                                 GetTaskList(null, null).Name);
+                                                                 FormatTaskListAsNecessary(defaultTaskList).Name);
                 ;
                 _activityTaskListener.Start();
             }
@@ -637,24 +708,41 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
         }
 
 
-
-
-
         public static WorkflowExecutionInfo WaitUntilWorkflowCompletes(string workflowId, string runId)
         {
+            return WaitUntilWorkflowCompletes(workflowId, runId, TimeSpan.MaxValue);
+        }
+
+        public static WorkflowExecutionInfo WaitUntilWorkflowCompletes(string workflowId, string runId, TimeSpan timeout)
+        {
+            if (timeout.TotalMilliseconds == 0) return null;
             // we put this in a big try catch because if the workflow doesn't exist, an exception will be thrown
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
             try
             {
                 do
                 {
-                    var theExecution = new WorkflowExecution().WithRunId(runId).WithWorkflowId(workflowId);
-                    var response =
-                        _workflowClient.DescribeWorkflowExecution(new DescribeWorkflowExecutionRequest().WithDomain(
-                            _domainName)
-                                                                      .WithExecution(
-                                                                          theExecution));
 
-                    var describeWorkflowExecutionResult = response.DescribeWorkflowExecutionResult;
+                    // ok, first - are we past the timeout?
+                    if (timeout.Seconds > 0 && sw.Elapsed > timeout)
+                        // we have to stop
+                        return null;
+
+                    var theExecution = new WorkflowExecution()
+                        {
+                            RunId = runId,
+                            WorkflowId = workflowId
+                        };
+
+                    var response =
+                        _workflowClient.DescribeWorkflowExecution(new DescribeWorkflowExecutionRequest()
+                            {
+                                Domain = _domainName,
+                                Execution = theExecution
+                            });
+
+                    var describeWorkflowExecutionResult = response;
                     var workflowExecutionInfo = describeWorkflowExecutionResult.WorkflowExecutionDetail.ExecutionInfo;
 
                     if (workflowExecutionInfo.ExecutionStatus == WorkflowExecutionStatus.Closed)
@@ -670,10 +758,10 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
                                                                                   null);
                             if (ev != null) // can we find out what the problem is??
                             {
-                            
+
 
                                 // throw the general exception
-                                throw new SimpleWorkflowDotNetFrameworkException( ev.WorkflowExecutionFailedEventAttributes.Reason, ev.WorkflowExecutionFailedEventAttributes.Details);
+                                throw new SimpleWorkflowDotNetFrameworkException(ev.WorkflowExecutionFailedEventAttributes.Reason, ev.WorkflowExecutionFailedEventAttributes.Details);
                             }
                         }
 
@@ -691,7 +779,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
                     new System.Threading.ManualResetEvent(false).WaitOne(1000);
                 } while (true);
             }
-            catch (AmazonSimpleWorkflowException ex )
+            catch (AmazonSimpleWorkflowException ex)
             {
                 WorkflowLogging.Error("Error occurred while waiting for workflow '{0}' to complete. \r\n\r\n{1}",
                     workflowId, ex);
@@ -719,8 +807,8 @@ namespace Amazon.SimpleWorkflow.DotNetFramework
         {
             List<ListenerMetrics> metrics = new List<ListenerMetrics>();
 
-            metrics.Add( _deciderTaskListener.GetLatestMetrics(monitoringStopWatch));
-            metrics.Add( _activityTaskListener.GetLatestMetrics(monitoringStopWatch));
+            metrics.Add(_deciderTaskListener.GetLatestMetrics(monitoringStopWatch));
+            metrics.Add(_activityTaskListener.GetLatestMetrics(monitoringStopWatch));
 
             monitoringStopWatch.Restart();  // restart the clock
 

@@ -11,7 +11,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests
     [TestClass]
     public class WorkflowManagerTests
     {
-        [TestMethod] 
+        [TestMethod]
         public void AutomatedWorkflowTypeGeneration_Test()
         {
             // makes sure that the system automatically generates all workflow types
@@ -23,7 +23,11 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests
             AmazonSimpleWorkflowClient client = new AmazonSimpleWorkflowClient();
 
             var domain = SimpleWorkflowFoundationSettings.Settings.Domain;
-            var workflowTypes = client.ListWorkflowTypes( new Model.ListWorkflowTypesRequest().WithDomain( domain ).WithRegistrationStatus("REGISTERED") );
+            var workflowTypes = client.ListWorkflowTypes(new Model.ListWorkflowTypesRequest()
+                {
+                    Domain = (domain),
+                    RegistrationStatus = ("REGISTERED")
+                });
 
             //// let's go through and delete all the types
             //foreach (var type in workflowTypes.ListWorkflowTypesResult.WorkflowTypeInfos.TypeInfos)
@@ -34,14 +38,18 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests
             // This breaks all the other workflow tests! WorkflowManager.Shutdown();
 
             // now, let's see if our workflow was cretaed
-            var workflowTypeDetail = client.DescribeWorkflowType(new DescribeWorkflowTypeRequest().WithDomain(domain).
-                WithWorkflowType(new WorkflowType().WithName("TestDecider").WithVersion(workflowVersion))).DescribeWorkflowTypeResult.WorkflowTypeDetail;
-            var config= workflowTypeDetail.Configuration;
+            var workflowTypeDetail = client.DescribeWorkflowType(new DescribeWorkflowTypeRequest()
+            {
+                Domain = (domain),
+                WorkflowType = new WorkflowType() { Name = ("TestDecider"), Version = (workflowVersion) }
+            })
+                .WorkflowTypeDetail;
+            var config = workflowTypeDetail.Configuration;
 
             // if the description failed, we would have had an exception by now
-            Assert.AreEqual( "ABANDON", config.DefaultChildPolicy );
+            Assert.AreEqual("ABANDON", config.DefaultChildPolicy);
             Assert.AreEqual("232", config.DefaultExecutionStartToCloseTimeout);
-            Assert.AreEqual("SomeTaskList", config.DefaultTaskList.Name );
+            Assert.AreEqual("SomeTaskList", config.DefaultTaskList.Name);
             Assert.AreEqual("22", config.DefaultTaskStartToCloseTimeout);
             Assert.AreEqual("SomeDescription", workflowTypeDetail.TypeInfo.Description);
 
@@ -51,21 +59,24 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests
         public void AutomatedActivityTypeGeneration_Test()
         {
             // makes sure that the system automatically generates all activity types
-            
+
             // IMPORTANT - you need to go to the app config and update the activity version with an unused version
             // or this test will FAIL. You can't delete a workflow type, only deprecate it
             const string activityVersion = "5";
             AmazonSimpleWorkflowClient client = new AmazonSimpleWorkflowClient();
 
             var domain = SimpleWorkflowFoundationSettings.Settings.Domain;
-            
+
             // now, based on the configuration, the workflow manager should automatically create the workflow
             WorkflowManager.Initialize();
             // This breaks all the other workflow tests! WorkflowManager.Shutdown();
 
             // now, let's see if our workflow was cretaed
-            var activityTypeDetail = client.DescribeActivityType(new DescribeActivityTypeRequest().WithDomain(domain).
-                WithActivityType(new ActivityType().WithName("TestActivity").WithVersion(activityVersion))).DescribeActivityTypeResult.ActivityTypeDetail;
+            var activityTypeDetail = client.DescribeActivityType(new DescribeActivityTypeRequest()
+            {
+                Domain = (domain),
+                ActivityType = (new ActivityType() { Name = ("TestActivity"), Version = (activityVersion) })
+            }).ActivityTypeDetail;
             var config = activityTypeDetail.Configuration;
 
             // if the description failed, we would have had an exception by now
@@ -79,5 +90,5 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests
             Assert.AreEqual("ADescription", activityTypeDetail.TypeInfo.Description);
 
         }
-     }
+    }
 }

@@ -8,8 +8,8 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Configuration
 {
     public class SimpleWorkflowFoundationSettings : ConfigurationSection
     {
-        const int DEFAULT_MAX_CONCURRENT_ACTIVITY_EXECUTIONS_PER_INSTANCE = 10;
-        const int DEFAULT_MAX_CONCURRENT_DECIDER_EXECUTIONS_PER_INSTANCE = 20;
+        const int DEFAULT_MAX_CONCURRENT_ACTIVITY_EXECUTIONS_PER_INSTANCE = 30;
+        const int DEFAULT_MAX_CONCURRENT_DECIDER_EXECUTIONS_PER_INSTANCE = 50;
         const int DEFAULT_METRICS_COLLECTION_PERIOD = 1000;
         private static SimpleWorkflowFoundationSettings _settings = ConfigurationManager.GetSection("SimpleWorkflowFoundationSettings") as SimpleWorkflowFoundationSettings;
         

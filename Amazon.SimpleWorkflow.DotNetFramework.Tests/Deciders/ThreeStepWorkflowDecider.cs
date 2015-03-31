@@ -19,21 +19,23 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests.Deciders
 
             var ac = WorkflowManager.FindActivityByType(typeof(ThreeStepWorkflowActivity));
 
-            var decision = DecisionGenerator.GenerateScheduleTaskActivityDecision(ac.DefaultTaskList ,
-                                                                                ac.Name , ac.Version , null);
+            var decision = DecisionGenerator.GenerateScheduleTaskActivityDecision(ac.DefaultTaskList,
+                                                                                ac.Name, ac.Version, null);
 
-                   
+
             var resp = new RespondDecisionTaskCompletedRequest()
-                        .WithTaskToken(taskToDecide.TaskToken)
-                        .WithDecisions(decision);
+                {
+                    TaskToken = taskToDecide.TaskToken,
+                    Decisions = new List<Decision> { decision }
+                };
 
             string fileName = WorkflowExecutionContext.GetWorkflowInput();
 
             var marker = WorkflowExecutionContext.GetWorkflowVariable("LineCount");
 
             int counter = 1;
-            if ( marker != null )       // this is NOT the first event
-                counter = int.Parse( marker.Details );
+            if (marker != null)       // this is NOT the first event
+                counter = int.Parse(marker.Details);
 
             if (counter <= 4)
             {
@@ -44,10 +46,10 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests.Deciders
                 WorkflowManager.SWFClient.RespondDecisionTaskCompleted(resp);
                 return;
             }
-            
+
             // only four lines
 
-            Decision completedDecision = DecisionGenerator.GenerateWorkflowCompletedDecision( null );
+            Decision completedDecision = DecisionGenerator.GenerateWorkflowCompletedDecision(null);
 
             resp.Decisions.Clear();
             resp.Decisions.Add(completedDecision);

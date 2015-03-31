@@ -23,7 +23,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
         [ThreadStatic]
         private static ActivityTask _currentActivityTask;
 
-        
+
         public static ActivityTask CurrentActivityTask
         {
             get
@@ -44,7 +44,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
 
             if (OnInitializeThreadForTask != null)
                 OnInitializeThreadForTask(activityTask);
-            
+
         }
 
         public static bool IsInActivity
@@ -83,7 +83,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
 
             if (OnInitializeThreadForTask != null)
                 OnInitializeThreadForTask(decisionTask);
-            
+
         }
 
         #endregion
@@ -106,24 +106,41 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
 
         public static string TaskToken
         {
-            get {
+            get
+            {
                 if (_currentDecisionTask != null) return _currentDecisionTask.TaskToken;
                 if (_currentActivityTask != null) return _currentActivityTask.TaskToken;
 
                 return null;
             }
-             
+
+        }
+
+        public static string PartialTaskToken
+        {
+            get
+            {
+                string token = null;
+                if (_currentDecisionTask != null) token = _currentDecisionTask.TaskToken;
+                if (_currentActivityTask != null) token = _currentActivityTask.TaskToken;
+
+                if (token != null)
+                    return token.Substring(token.Length - 8, 6); // get rid of the last two equals signs
+
+                return null;
+            }
+
         }
 
         #endregion
 
         #region Activity-Related Utilities
 
-        public static string GetActivityInput()  
+        public static string GetActivityInput()
         {
-            if ( !IsInActivity ) throw new NotSupportedException("This method can only be called from inside an activity.");
+            if (!IsInActivity) throw new NotSupportedException("This method can only be called from inside an activity.");
 
-            string input = _getInputFromS3IfNecessary(WorkflowExecutionContext.CurrentActivityTask.Input);
+            string input = GetInputFromS3IfNecessary(WorkflowExecutionContext.CurrentActivityTask.Input);
             if (input == null) return null;
 
             return input;
@@ -146,17 +163,19 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
                     decisionTask.Events[0].WorkflowExecutionStartedEventAttributes == null)
                     return null;
 
-                return _getInputFromS3IfNecessary(decisionTask.Events[0].WorkflowExecutionStartedEventAttributes.Input);
+                return GetInputFromS3IfNecessary(decisionTask.Events[0].WorkflowExecutionStartedEventAttributes.Input);
             }
 
             var execution = WorkflowExecutionContext.Current;
 
             var history =
-                WorkflowManager.SWFClient.GetWorkflowExecutionHistory(new GetWorkflowExecutionHistoryRequest().
-                                                                          WithDomain(
-                                                                              WorkflowManager.Domain).
-                                                                          WithMaximumPageSize(1).WithExecution(execution))
-                    .GetWorkflowExecutionHistoryResult.History;
+                WorkflowManager.SWFClient.GetWorkflowExecutionHistory(new GetWorkflowExecutionHistoryRequest()
+                {
+                    Domain = WorkflowManager.Domain,
+                    MaximumPageSize = 1,
+                    Execution = execution
+                })
+                    .History;
 
             if (history.Events.Count == 0 || history.Events[0].WorkflowExecutionStartedEventAttributes == null)
                 return null;
@@ -166,30 +185,15 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
 
 
 
-        
-        public static MarkerRecordedEventAttributes GetWorkflowVariable(string variableName)
-        {
-            
-            var markerEvent = FindMostRecentEvent( x =>
-                                                                         x.EventType ==
-                                                                         WorkflowHistoryEventTypes.MarkerRecorded &&
-                                                                         x.MarkerRecordedEventAttributes != null &&
-                                                                         x.MarkerRecordedEventAttributes.MarkerName ==
-                                                                         variableName);
 
-
-
-            if (markerEvent != null)
-                return markerEvent.MarkerRecordedEventAttributes;
-
-            return null; // nothing to return
-
-        }
-
+   
         public static WorkflowExecutionDetail DescribeCurrentlyExecutingWorkflow()
         {
-            return WorkflowManager.SWFClient.DescribeWorkflowExecution(new DescribeWorkflowExecutionRequest().WithDomain(WorkflowManager.Domain)
-                .WithExecution(Current)).DescribeWorkflowExecutionResult.WorkflowExecutionDetail ;
+            return WorkflowManager.SWFClient.DescribeWorkflowExecution(new DescribeWorkflowExecutionRequest()
+            {
+                Domain = WorkflowManager.Domain,
+                Execution = (Current)
+            }).WorkflowExecutionDetail;
         }
 
         public static string PrepareInputForWorkflow(string input)
@@ -200,31 +204,33 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
                 return input;
 
             // we have to save this to S3
-            var s3 = Amazon.AWSClientFactory.CreateAmazonS3Client();
-            PutObjectRequest req = new PutObjectRequest();
-            req.BucketName = SimpleWorkflowFoundationSettings.Settings.S3BucketName;
+            using (var s3 = Amazon.AWSClientFactory.CreateAmazonS3Client())
+            {
+                PutObjectRequest req = new PutObjectRequest();
+                req.BucketName = SimpleWorkflowFoundationSettings.Settings.S3BucketName;
 
 
-            req.Key = Guid.NewGuid().ToString();
+                req.Key = Guid.NewGuid().ToString();
 
-            // compress the entire packet
-            var bytes = Encoding.ASCII.GetBytes(input);
-            MemoryStream ms = new MemoryStream(bytes);
-            ms.Position = 0;
-            req.WithInputStream(ms);
+                // compress the entire packet
+                var bytes = Encoding.ASCII.GetBytes(input);
+                MemoryStream ms = new MemoryStream(bytes);
+                ms.Position = 0;
+                req.InputStream = (ms);
 
-            // put the object in  S3
-            s3.PutObject(req);
+                // put the object in  S3
+                s3.PutObject(req);
 
-            
-            if (File.Exists(@"c:\temp\inputToS3.txt"))
-                File.Delete(@"c:\temp\inputToS3.txt");
-            File.WriteAllBytes(@"c:\temp\inputToS3.txt", bytes);    // now write it out
 
-            return CHECK_S3_PREFIX + req.Key;
+                if (File.Exists(@"c:\temp\inputToS3.txt"))
+                    File.Delete(@"c:\temp\inputToS3.txt");
+                File.WriteAllBytes(@"c:\temp\inputToS3.txt", bytes);    // now write it out
+
+                return CHECK_S3_PREFIX + req.Key;
+            }
         }
 
-        private static string _getInputFromS3IfNecessary(string input)
+        private static string GetInputFromS3IfNecessary(string input)
         {
             if (input == null)
                 return null;
@@ -234,31 +240,33 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
 
             // ok, so the input is in S3
             // first, we need to find the guid
-            string[] parts = input.Split('|');
+            var parts = input.Split('|');
             if (parts.Length < 2) // something's wrong
                 return null;
 
-            string guid = parts[1];
+            var guid = parts[1];
 
-            var s3 = Amazon.AWSClientFactory.CreateAmazonS3Client();
-            GetObjectRequest req = new GetObjectRequest();
-            req.BucketName = SimpleWorkflowFoundationSettings.Settings.S3BucketName;
+            using (var s3 = AWSClientFactory.CreateAmazonS3Client())
+            {
+                var req = new GetObjectRequest {BucketName = SimpleWorkflowFoundationSettings.Settings.S3BucketName, Key = (guid)};
 
-            req.WithKey(guid);
+                using (var response = s3.GetObject(req))
+                {
+                    using (var ms = new MemoryStream((int)response.ResponseStream.Length))
+                    {
+                        response.ResponseStream.CopyTo(ms);
 
-            var response = s3.GetObject(req);
+                        var bytes = ms.GetBuffer();
+                        var s3Data = Encoding.ASCII.GetString(bytes);
 
-            MemoryStream ms = new MemoryStream();
-            response.ResponseStream.CopyTo(ms);
+                        if (File.Exists(@"c:\temp\outputFromS3.txt"))
+                            File.Delete(@"c:\temp\outputFromS3.txt");
+                        File.WriteAllBytes(@"c:\temp\outputFromS3.txt", bytes);    // now write it out
 
-            var bytes = ms.ToArray();
-            var s3Data = Encoding.ASCII.GetString(bytes);
-
-            if (File.Exists(@"c:\temp\outputFromS3.txt"))
-                File.Delete(@"c:\temp\outputFromS3.txt");
-            File.WriteAllBytes(@"c:\temp\outputFromS3.txt", bytes);    // now write it out
-
-            return s3Data;
+                        return s3Data;
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -268,8 +276,11 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
         public static void CompleteCurrentWorkflow(string result)
         {
             WorkflowManager.SWFClient.RespondDecisionTaskCompleted(new RespondDecisionTaskCompletedRequest()
-            .WithTaskToken(WorkflowExecutionContext.CurrentDecisionTask.TaskToken).WithDecisions(new List<Decision> {
-                 DecisionGenerator.GenerateWorkflowCompletedDecision( result ) }));
+            {
+                TaskToken = WorkflowExecutionContext.CurrentDecisionTask.TaskToken,
+                Decisions = new List<Decision> {
+                 DecisionGenerator.GenerateWorkflowCompletedDecision( result ) }
+            });
         }
 
         /// <summary>
@@ -279,8 +290,13 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
         public static void CancelCurrentWorkflow(string result)
         {
             WorkflowManager.SWFClient.RespondDecisionTaskCompleted(new RespondDecisionTaskCompletedRequest()
-            .WithTaskToken(WorkflowExecutionContext.CurrentDecisionTask.TaskToken).WithDecisions(new List<Decision> {
-                 DecisionGenerator.GenerateWorkflowCancelledDecision( result ) }));
+                {
+                    TaskToken = WorkflowExecutionContext.CurrentDecisionTask.TaskToken,
+                    Decisions = new List<Decision>
+                        {
+                            DecisionGenerator.GenerateWorkflowCancelledDecision(result)
+                        }
+                });
         }
 
         /// <summary>
@@ -291,8 +307,13 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
         public static void FailCurrentWorkflow(string reason, string details)
         {
             WorkflowManager.SWFClient.RespondDecisionTaskCompleted(new RespondDecisionTaskCompletedRequest()
-            .WithTaskToken(WorkflowExecutionContext.CurrentDecisionTask.TaskToken).WithDecisions(new List<Decision> {
-                 DecisionGenerator.GenerateWorkflowFailedDecision( reason, details ) }));
+                {
+                    TaskToken = WorkflowExecutionContext.CurrentDecisionTask.TaskToken,
+                    Decisions = new List<Decision>
+                        {
+                            DecisionGenerator.GenerateWorkflowFailedDecision(reason, details)
+                        }
+                });
         }
         #endregion
 
@@ -314,29 +335,29 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
         /// </exception>
         /// <remarks>If the decision task has a NextPageToken, this method reverts to the
         /// overload that queries the workflow history.</remarks>
-        public static HistoryEvent FindMostRecentEvent( Predicate<HistoryEvent> matchCriteria)
+        public static HistoryEvent FindMostRecentEvent(Predicate<HistoryEvent> matchCriteria)
         {
             if (!IsInDecider)
-                return FindMostRecentEvent( Current, matchCriteria);    // need to use workflow execution
+                return FindMostRecentEvent(Current, matchCriteria);    // need to use workflow execution
             var taskToDecide = CurrentDecisionTask;
-            
-            
+
+
             if (taskToDecide.NextPageToken != null)   // there are other tasks to look at
                 return FindMostRecentEvent(Current, matchCriteria);
 
             for (int i = taskToDecide.Events.Count - 1; i >= 0; i--)
             {
                 var eventToCheck = taskToDecide.Events[i];
-                if ( matchCriteria == null || matchCriteria(eventToCheck))  // it's a match
+                if (matchCriteria == null || matchCriteria(eventToCheck))  // it's a match
                     return eventToCheck;
             }
 
             return null;    // no event matches any criteria
         }
 
-        public static HistoryEvent FindMostRecentEvent( WorkflowExecution execution, Predicate<HistoryEvent> matchCriteria)
+        public static HistoryEvent FindMostRecentEvent(WorkflowExecution execution, Predicate<HistoryEvent> matchCriteria)
         {
-            
+
             string nextPageToken = null;
 
             do
@@ -344,12 +365,14 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
                 //if (nextPageToken != null)
                 //    LogWithContext.Debug ("Getting next batch of events...");
                 var history =
-                    WorkflowManager.SWFClient.GetWorkflowExecutionHistory(new GetWorkflowExecutionHistoryRequest().
-                                                                              WithDomain(WorkflowManager.Domain)
-                                                                              .WithExecution(execution).
-                                                                              WithReverseOrder(true).WithNextPageToken(
-                                                                                  nextPageToken)).
-                        GetWorkflowExecutionHistoryResult.History;
+                    WorkflowManager.SWFClient.GetWorkflowExecutionHistory(new GetWorkflowExecutionHistoryRequest()
+                    {
+                        Domain = (WorkflowManager.Domain),
+                        Execution = (execution),
+                        ReverseOrder = (true),
+                        NextPageToken = nextPageToken
+                    }).
+                        History;
 
                 nextPageToken = history.NextPageToken; // set the next page token
 
@@ -379,18 +402,21 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
             do
             {
                 var history =
-                    WorkflowManager.SWFClient.GetWorkflowExecutionHistory(new GetWorkflowExecutionHistoryRequest().
-                                                                              WithDomain(WorkflowManager.Domain)
-                                                                              .WithExecution(execution).
-                                                                              WithReverseOrder(true).WithNextPageToken(
-                                                                                  nextPageToken)).
-                        GetWorkflowExecutionHistoryResult.History;
+                    WorkflowManager.SWFClient.GetWorkflowExecutionHistory(new GetWorkflowExecutionHistoryRequest()
+                    {
+                        Domain = (WorkflowManager.Domain),
+                        Execution = (execution),
+                        ReverseOrder = (true),
+                        NextPageToken = (
+                            nextPageToken)
+                    }).
+                        History;
 
                 nextPageToken = history.NextPageToken; // set the next page token
 
                 foreach (var eventToCheck in history.Events)   // remember this is in reverse order now
                     if (matchCriteria == null || matchCriteria(eventToCheck))  // it's a match
-                        events.Add( eventToCheck );
+                        events.Add(eventToCheck);
 
 
             } while (nextPageToken != null);    // keep going until there are no more pages
@@ -412,11 +438,39 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
         public static void ContinueCurrentWorkflowAsNew(string result)
         {
             WorkflowManager.SWFClient.RespondDecisionTaskCompleted(
-                       new RespondDecisionTaskCompletedRequest()
-                           .WithTaskToken(WorkflowExecutionContext.CurrentDecisionTask.TaskToken)
-                           .WithDecisions(new List<Decision> {
-                                DecisionGenerator.GenerateContinueWorkflowAsNewDecision( result ) 
-                                }));
+                new RespondDecisionTaskCompletedRequest()
+                    {
+                        TaskToken = WorkflowExecutionContext.CurrentDecisionTask.TaskToken,
+                        Decisions = new List<Decision>
+                            {
+                                DecisionGenerator.GenerateContinueWorkflowAsNewDecision(result)
+                            }
+                    });
         }
+
+        public static HistoryEvent GetWorkflowVariableHistoryEvent(string variableName)
+        {
+            return FindMostRecentEvent(x =>
+                                                                         x.EventType ==
+                                                                         WorkflowHistoryEventTypes.MarkerRecorded &&
+                                                                         x.MarkerRecordedEventAttributes != null &&
+                                                                         x.MarkerRecordedEventAttributes.MarkerName ==
+                                                                         variableName);
+        }
+
+        public static MarkerRecordedEventAttributes GetWorkflowVariable(string variableName)
+        {
+
+
+
+            var markerEvent = GetWorkflowVariableHistoryEvent(variableName);
+
+            if (markerEvent != null)
+                return markerEvent.MarkerRecordedEventAttributes;
+
+            return null; // nothing to return
+
+        }
+
     }
 }

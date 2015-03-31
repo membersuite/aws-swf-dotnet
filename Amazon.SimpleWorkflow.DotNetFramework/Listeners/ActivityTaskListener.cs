@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Configuration;
 using System.Diagnostics;
 using System.Threading;
 using Amazon.SimpleWorkflow.DotNetFramework.Base;
 using Amazon.SimpleWorkflow.DotNetFramework.Configuration;
 using Amazon.SimpleWorkflow.DotNetFramework.Util;
 using Amazon.SimpleWorkflow.Model;
+using MemberSuite;
 
 
 namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
@@ -14,7 +16,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
     /// </summary>
     public class ActivityTaskListener : BaseSWFListener
     {
-      
+
         public ActivityTaskListener(AmazonSimpleWorkflowClient workflowClient, string workflowDomain, string taskList)
             : base(workflowClient, workflowDomain, taskList)
         {
@@ -33,19 +35,29 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
                 Thread.Sleep(1000);  // if the thread is paused, hold on
 
             // do we have a throttle?
-            
-            int maxConcurrentExecutionsPerInstance = SimpleWorkflowFoundationSettings.Settings.MaxActivityThreads ;
+
+            int maxConcurrentExecutionsPerInstance = SimpleWorkflowFoundationSettings.Settings.MaxActivityThreads;
 
 
-
+            int counter = 0;
             while (numberOfCurrentlyRunningTasks >= maxConcurrentExecutionsPerInstance)
+            {
+                counter++;
                 Thread.Sleep(1000); // just wait until we can start polling
+                if (counter % 10 == 0)
+                    WorkflowLogging.Debug(
+                        "Task listener {0} is waiting... currently {1} tasks are running and a maximum of {2} threads can be active. Thread count: {3}",
+                        Name,
+                        numberOfCurrentlyRunningTasks, maxConcurrentExecutionsPerInstance, this.threadQueue.Count);
+            }
 
 
             _workflowClient.BeginPollForActivityTask(new PollForActivityTaskRequest()
-                                                     .WithDomain(_workflowDomain)
-                                                     .WithTaskList(WorkflowManager.GetTaskList(null, _taskList))
-                                                      .WithIdentity(getIdentity())
+            {
+                Domain = (_workflowDomain),
+                TaskList = (WorkflowManager.FormatTaskListAsNecessary(_taskList)),
+                Identity = (getIdentity())
+            }
                                                      ,
                                                  pollingCallBack, null);
         }
@@ -63,16 +75,24 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
                 retryManager.ResetExponentialBackoff(); // we didn't encounter an error
 
                 // is it a timeout?
-                if (!string.IsNullOrWhiteSpace(resp.PollForActivityTaskResult.ActivityTask.TaskToken))
+                var taskToken = resp.ActivityTask.TaskToken;
+                if (!string.IsNullOrWhiteSpace(taskToken))
                 // we don't have a timeout - we have an actual task
                 {
 
-                    Interlocked.Increment(ref numberOfCurrentlyRunningTasks); // need to use thread safe increments here
 
-                    
+                    var newRunningTasks = Interlocked.Increment(ref numberOfCurrentlyRunningTasks); // need to use thread safe increments here
+
+                    if (ConfigurationManager.AppSettings["VerboseSWFLogging"] == "true")
+                        WorkflowLogging.Debug("WFM: Incrementing running tasks to {0} for task token ending {1}. Thread count: {2}",
+                                              newRunningTasks, taskToken.Substring(taskToken.Length - 8, 6), threadQueue.Count);
+
                     Thread t = new Thread(new ParameterizedThreadStart(_runActivityProcessAsync));
-                    startThread(t, resp.PollForActivityTaskResult.ActivityTask);
-                    
+                    t.IsBackground = true;
+                    startThread(t, resp.ActivityTask);
+                    //ThreadPool.QueueUserWorkItem(_runActivityProcessAsync, resp.PollForActivityTaskResult.ActivityTask);
+
+
                     // update the internal metrics
                     recordMetricsForNewTask();
                 }
@@ -112,7 +132,11 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
             try
             {
                 ActivityTask task = (ActivityTask)state;
-                if (task == null) return;
+                if (task == null)
+                {
+                    WorkflowLogging.Debug("ERROR: No task passed to activity... exiting.");
+                    return;
+                }
 
                 string activityType = task.ActivityType.Name;
                 var activityConfiguration = SimpleWorkflowFoundationSettings.Settings.FindActivity(activityType);
@@ -132,15 +156,21 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
                 }
 
                 // ok, we don't have a timeout
-                IWorkflowActivity workflowActivity = Activator.CreateInstance(_relevantType) as IWorkflowActivity;
+                IWorkflowActivity workflowActivity = Container.GetOrCreateInstance(_relevantType) as IWorkflowActivity;
 
                 if (workflowActivity == null)
                 {
-                    //LogWithContext.Debug("Workflow class '{0}' does not implement IWorkflowActivity.", Name);
+                    WorkflowLogging.Debug("Workflow class '{0}' does not implement IWorkflowActivity. Exiting...", Name);
                     return;
                 }
 
                 WorkflowExecutionContext.InitializeThread(task); // setup the executon context
+
+                if (ConfigurationManager.AppSettings["VerboseSWFLogging"] == "true")
+                    WorkflowLogging.Debug("WRM: Activity thread initialized, beginning task workflow execution #{0}, run {1}, token {2}.",
+                        task.WorkflowExecution.WorkflowId, task.WorkflowExecution.RunId,
+                                          workflowActivity.GetType().Name);
+
                 workflowActivity.Process();
 
 
@@ -154,12 +184,24 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
             {
                 try
                 {
-                    Interlocked.Decrement(ref numberOfCurrentlyRunningTasks); // need to use thread safe decrements here
+                    var newRunningTasks = Interlocked.Decrement(ref numberOfCurrentlyRunningTasks); // need to use thread safe decrements here
+
+                    ActivityTask task = (ActivityTask)state;
+
+                    var taskToken = task.TaskToken;
+
                     registerEndOfThread(Thread.CurrentThread);
+
+                    if (ConfigurationManager.AppSettings["VerboseSWFLogging"] == "true")
+                        WorkflowLogging.Debug("WFM: Decrementing running tasks to {0} for task token ending {1}. Thread count: {2}",
+                                              newRunningTasks, taskToken.Substring(taskToken.Length - 8, 6), threadQueue.Count);
+
+
                 }
-                catch
+                catch (Exception ex)
                 {
                     // this CANNOT fail or it will bring down the entire application
+                    Console.WriteLine("CRITICAL ERROR:" + ex);
                 }
             }
         }

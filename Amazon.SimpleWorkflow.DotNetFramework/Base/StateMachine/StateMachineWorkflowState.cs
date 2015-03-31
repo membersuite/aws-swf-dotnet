@@ -5,6 +5,7 @@ using System.Text;
 using Amazon.SimpleWorkflow.DotNetFramework.Configuration;
 using Amazon.SimpleWorkflow.DotNetFramework.Util;
 using Amazon.SimpleWorkflow.Model;
+using MemberSuite;
 
 namespace Amazon.SimpleWorkflow.DotNetFramework.Base.StateMachine
 {
@@ -13,8 +14,8 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base.StateMachine
     /// </summary>
     public abstract class StateMachineWorkflowState
     {
-       
-       private string _defaultInputToUse = null;
+
+        private string _defaultInputToUse = null;
 
         public string DefaultInputToUse
         {
@@ -114,14 +115,18 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base.StateMachine
             string version = wc.Version;
             string taskList = wc.DefaultTaskList;
 
-            var req = new RespondDecisionTaskCompletedRequest().WithTaskToken(WorkflowExecutionContext.CurrentDecisionTask.TaskToken).WithDecisions(
-                new List<Decision> { 
+            var req = new RespondDecisionTaskCompletedRequest()
+            {
+                TaskToken = WorkflowExecutionContext.CurrentDecisionTask.TaskToken,
+                Decisions =
+                    new List<Decision> { 
                     DecisionGenerator.GenerateScheduleTaskActivityDecision(taskList, name, version, input),
 
                     // and, let's record the current state
                     DecisionGenerator.GenerateMarkerDecision( StateMachineWorkflowDecider.STATE_MARKER_NAME, 
                     GetType().Name )
-                });
+                }
+            };
             
             return WorkflowManager.SWFClient.RespondDecisionTaskCompleted( req );
         }
@@ -129,12 +134,15 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base.StateMachine
         protected void transitionTo<T>(string input) where T:StateMachineWorkflowState
         {
             // first, let's record the state
-            var state = (StateMachineWorkflowState) Activator.CreateInstance(typeof(T));
+            var state = (StateMachineWorkflowState)Container.GetOrCreateInstance(typeof(T));
             
             state.Execute(input );
 
         }
 
-      
+        protected void transitionTo<T>() where T : StateMachineWorkflowState
+        {
+            transitionTo<T>(DefaultInputToUse);
+        }
     }
 }

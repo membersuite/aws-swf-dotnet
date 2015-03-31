@@ -22,10 +22,10 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests
 
             // let's do one run where the system should navigate to first, then second
 
-            var tags = new List<string> {"SimpleStateMachineWorkflow_Test"};
+            var tags = new List<string> { "SimpleStateMachineWorkflow_Test" };
             var resp = WorkflowManager.StartWorkflow("TestStateMachineWorkflow", workflowExecutionId, null, "second",
                                                      tags);
-            WorkflowManager.WaitUntilWorkflowCompletes(workflowExecutionId, resp.StartWorkflowExecutionResult.Run.RunId);
+            WorkflowManager.WaitUntilWorkflowCompletes(workflowExecutionId, resp.Run.RunId);
 
             Assert.AreEqual("12", TestStateMachineWorkflow.StaticString,
                             "State machine didn't function correctly the first time");
@@ -35,7 +35,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests
             TestStateMachineWorkflow.StaticString = "";
 
             resp = WorkflowManager.StartWorkflow("TestStateMachineWorkflow", workflowExecutionId, null, "3", tags);
-            WorkflowManager.WaitUntilWorkflowCompletes(workflowExecutionId, resp.StartWorkflowExecutionResult.Run.RunId);
+            WorkflowManager.WaitUntilWorkflowCompletes(workflowExecutionId, resp.Run.RunId);
 
             Assert.AreEqual("13", TestStateMachineWorkflow.StaticString,
                             "State machine didn't function correctly the second time");
@@ -50,16 +50,16 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests
             var workflowExecutionId = Guid.NewGuid().ToString();
 
             // let's do one run where the system should navigate to first, then second
-            var tags = new List<string> {"SimpleStateMachineWorkflow_HandleFailure_Test"};
+            var tags = new List<string> { "SimpleStateMachineWorkflow_HandleFailure_Test" };
             var resp = WorkflowManager.StartWorkflow("TestStateMachineWorkflow", workflowExecutionId, null, "exception",
                                                      tags);
-            var runId = resp.StartWorkflowExecutionResult.Run.RunId;
+            var runId = resp.Run.RunId;
             try
             {
                 WorkflowManager.WaitUntilWorkflowCompletes(workflowExecutionId, runId);
                 Assert.Fail("Exception not thrown");
             }
-            catch (ApplicationException ex)
+            catch (ApplicationException)
             {
             }
 
@@ -71,13 +71,13 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests
                 WorkflowManager.WaitUntilWorkflowCompletes(workflowExecutionId, runId);
                 Assert.Fail("Exception not thrown");
             }
-            catch (ApplicationException ex)
+            catch (ApplicationException)
             {
             }
 
             var lastTask =
                 WorkflowExecutionContext.FindMostRecentEvent(
-                    new WorkflowExecution().WithRunId(runId).WithWorkflowId(workflowExecutionId),
+                    new WorkflowExecution() { RunId = (runId), WorkflowId = workflowExecutionId },
                     null);
 
             Assert.AreEqual(WorkflowHistoryEventTypes.WorkflowExecutionFailed, lastTask.EventType);

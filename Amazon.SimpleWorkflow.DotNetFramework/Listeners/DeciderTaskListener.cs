@@ -5,6 +5,7 @@ using Amazon.SimpleWorkflow.DotNetFramework.Base;
 using Amazon.SimpleWorkflow.DotNetFramework.Configuration;
 using Amazon.SimpleWorkflow.DotNetFramework.Util;
 using Amazon.SimpleWorkflow.Model;
+using MemberSuite;
 
 
 namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
@@ -14,7 +15,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
     /// </summary>
     public class DeciderTaskListener : BaseSWFListener
     {
-      
+
 
         public DeciderTaskListener(AmazonSimpleWorkflowClient workflowClient,
             string workflowDomain, string taskList)
@@ -45,13 +46,13 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
                 Thread.Sleep(1000); // just wait until we can start polling
             
 
-            var taskList = WorkflowManager.GetTaskList(null, _taskList);
+            var taskList = WorkflowManager.FormatTaskListAsNecessary(_taskList);
             _workflowClient.BeginPollForDecisionTask(new PollForDecisionTaskRequest()
-                                                     .WithDomain(_workflowDomain)
-                                                     .WithTaskList(taskList)
-                                                     .WithIdentity( getIdentity())
-                                                     ,
-                                                 pollingCallBack, null );
+            {
+                Domain = (_workflowDomain),
+                TaskList = (taskList),
+                Identity = (getIdentity())
+            },pollingCallBack, null);
         }
 
         private void pollingCallBack(IAsyncResult ar)
@@ -63,17 +64,20 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
 
                 // let's get the result
                 var resp = _workflowClient.EndPollForDecisionTask(ar);
-                
+
                 retryManager.ResetExponentialBackoff(); // we didn't encounter an exception
 
                 // is it a timeout?
-                if (!string.IsNullOrWhiteSpace(resp.PollForDecisionTaskResult.DecisionTask.TaskToken))
+                if (!string.IsNullOrWhiteSpace(resp.DecisionTask.TaskToken))
                 // we don't have a timeout - we have an actual task
                 {
 
                     Interlocked.Increment(ref numberOfCurrentlyRunningTasks); // need to use thread safe increments here
                     Thread t = new Thread(new ParameterizedThreadStart(_runDecisionProcessAsync));
-                    startThread(t, resp.PollForDecisionTaskResult.DecisionTask);
+                    t.IsBackground = true;
+                    startThread(t, resp.DecisionTask);
+                    //ThreadPool.QueueUserWorkItem(_runDecisionProcessAsync, resp.PollForDecisionTaskResult.DecisionTask );
+
                     // update internal metrics
                     recordMetricsForNewTask();
 
@@ -111,7 +115,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
 
         }
 
-       
+
 
         private void _runDecisionProcessAsync(object state)
         {
@@ -138,7 +142,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Listeners
                     return; // shouldn't happen, we vetted this out
                 }
 
-                IWorkflowDecider decider = Activator.CreateInstance(_relevantType) as IWorkflowDecider;
+                IWorkflowDecider decider = Container.GetOrCreateInstance(_relevantType) as IWorkflowDecider;
 
                 if (decider == null)
                 {

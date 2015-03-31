@@ -18,7 +18,17 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
 
         protected virtual int getHeartbeatInterval()
         {
-            return DEFAULT_HEARTBEAT_INTERVAL;
+            var interval =  DEFAULT_HEARTBEAT_INTERVAL;
+
+            // let's randomize it a bit
+            var baseInterval = interval / 2;
+            var randomVariance = new Random().Next(interval);   // get a random number between 0 and 10000
+
+            var inter =  baseInterval + randomVariance;       // in the case of a 10 sec interval, this yields and interval betwen 5 and 15
+
+            //WorkflowLogging.Debug("{0}: calculated heartbeat interval: {1}", GetType().Name, inter );
+
+            return inter;
         }
 
         private Timer _heartbeatTimer;
@@ -37,16 +47,16 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
                 processWorkflowActivity();
 
                 if (!hasCompletionBeenSignalled)
-                    complete(null ); // complete the activity automatically; without this, the workflow will hang
+                    Complete(null); // complete the activity automatically; without this, the workflow will hang
             }
             catch (SimpleWorkflowDotNetFrameworkException cex)
             {
                 try
                 {
-                    WorkflowManager.SWFClient.RespondActivityTaskFailed(new RespondActivityTaskFailedRequest()
-                                                                            .WithTaskToken(taskToProcess.TaskToken)
-                                                                            .WithReason(cex.ErrorCode )
-                                                                            .WithDetails(cex.Message));
+                    WorkflowManager.SWFClient.RespondActivityTaskFailed(new RespondActivityTaskFailedRequest() {
+                                                                            TaskToken = taskToProcess.TaskToken,
+                                                                            Reason = cex.ErrorCode,
+                                                                            Details = cex.Message });
 
                 }
                 catch (Exception ex2)
@@ -59,10 +69,13 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
                 // this CANNOT cause an exception or it will fail threads and unit tests
                 try
                 {
+
                     WorkflowManager.SWFClient.RespondActivityTaskFailed(new RespondActivityTaskFailedRequest()
-                                                                            .WithTaskToken(taskToProcess.TaskToken)
-                                                                            .WithReason("Exception").WithDetails(
-                                                                                ex.ToString()));
+                        {
+                            TaskToken = taskToProcess.TaskToken,
+                            Reason = "Exception",
+                            Details = ex.ToString()
+                        });
                 }
                 catch (Exception ex2)
                 {
@@ -84,6 +97,7 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
 
         private void scheduleHeartbeatTimer( string taskToken)
         {
+            //WorkflowLogging.Debug("{0}: Scheduling heartbeat", GetType().Name);
             // we have to pass the task token in - we can't get it from the thread
             if (activityIsCompleted) return;    // no more late heartbeats!
 
@@ -92,21 +106,29 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
                                             Timeout.Infinite);
             else
                 _heartbeatTimer.Change(getHeartbeatInterval(), Timeout.Infinite);   // just change it
+
+            //WorkflowLogging.Debug("{0}: Scheduling heartbeat successfully", GetType().Name);
         }
 
         private void sendHeartBeat(object state)
         {
+            //WorkflowLogging.Debug("{0}: Sending heartbeat #1", GetType().Name);
             if (activityIsCompleted) return;    // no more late heartbeats!
             string taskToken = (string)state;
-            
+
+            //WorkflowLogging.Debug("{0}: send heartbeat #2", GetType().Name);
             try
             {
 
 
                 WorkflowManager.SWFClient.RecordActivityTaskHeartbeat(new RecordActivityTaskHeartbeatRequest()
-                .WithTaskToken(taskToken));
+                {
+                    TaskToken = (taskToken)
+                });
 
-                // only schedule the heartbeat if it was successful
+                //WorkflowLogging.Debug("{0}: heartbeat sent", GetType().Name);
+
+                // always send the heartbeat though
                 scheduleHeartbeatTimer(taskToken);
             }
             catch (AmazonSimpleWorkflowException ex)
@@ -127,12 +149,15 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
         protected abstract void processWorkflowActivity();
 
         protected bool hasCompletionBeenSignalled = false;
-        protected RespondActivityTaskCompletedResponse complete( string result)
+        protected RespondActivityTaskCompletedResponse Complete( string result)
         {
             hasCompletionBeenSignalled = true;
             if (WorkflowExecutionContext.CurrentActivityTask == null) return null;
-            return WorkflowManager.SWFClient.RespondActivityTaskCompleted(new RespondActivityTaskCompletedRequest().WithTaskToken(WorkflowExecutionContext.CurrentActivityTask.TaskToken)
-                .WithResult(result));
+            return WorkflowManager.SWFClient.RespondActivityTaskCompleted(new RespondActivityTaskCompletedRequest()
+                {
+                    TaskToken = WorkflowExecutionContext.CurrentActivityTask.TaskToken,
+                    Result = result
+                });
         }
 
         /// <summary>
@@ -144,9 +169,17 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Base
         protected RespondActivityTaskFailedResponse fail(string reason, string details)
         {
             hasCompletionBeenSignalled = true;
+            if ( details != null &&  details.Length > 32768)
+                details = details.Substring(0, 32768);
+
+            if ( reason != null && reason.Length > 256)
+                reason = reason.Substring(0, 256);
+
             if (WorkflowExecutionContext.CurrentActivityTask == null) return null;
-            return WorkflowManager.SWFClient.RespondActivityTaskFailed(new RespondActivityTaskFailedRequest().WithTaskToken(WorkflowExecutionContext.CurrentActivityTask.TaskToken)
-                .WithReason(reason).WithDetails(details));
+            return WorkflowManager.SWFClient.RespondActivityTaskFailed(new RespondActivityTaskFailedRequest() {
+                TaskToken = WorkflowExecutionContext.CurrentActivityTask.TaskToken,
+                Reason = reason,
+                Details = (details) });
         }
 
        

@@ -21,12 +21,18 @@ namespace Amazon.SimpleWorkflow.DotNetFramework.Tests
             Assert.Inconclusive("Test requires threads.");
 
             string workflowExecutionId = Guid.NewGuid().ToString();
-            var resp  = WorkflowManager.StartWorkflow("TimerWorkflow", workflowExecutionId, null, null, null);
-            WorkflowManager.WaitUntilWorkflowCompletes(workflowExecutionId, resp.StartWorkflowExecutionResult.Run.RunId);
+            var resp = WorkflowManager.StartWorkflow("TimerWorkflow", workflowExecutionId, null, null, null);
+            WorkflowManager.WaitUntilWorkflowCompletes(workflowExecutionId, resp.Run.RunId);
 
             var history = WorkflowManager.SWFClient.GetWorkflowExecutionHistory(new Model.GetWorkflowExecutionHistoryRequest()
-            .WithDomain(WorkflowManager.Domain)
-            .WithExecution(new Model.WorkflowExecution().WithWorkflowId(workflowExecutionId).WithRunId(resp.StartWorkflowExecutionResult.Run.RunId))).GetWorkflowExecutionHistoryResult.History;
+            {
+                Domain = (WorkflowManager.Domain),
+                Execution = new Model.WorkflowExecution()
+                {
+                    WorkflowId = (workflowExecutionId),
+                    RunId = resp.Run.RunId
+                }
+            }).History;
 
             // should be three runs
             Assert.AreEqual(3, history.Events.Count(x => x.EventType == WorkflowHistoryEventTypes.TimerFired), "Wrong number of timer fired");
